@@ -1,39 +1,37 @@
 package main
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/erumble/dynamo-playground/pkg/logger"
 	"github.com/erumble/dynamo-playground/pkg/node"
 )
 
 func main() {
-	// fmt.Println("Running node recursion test...")
+	logLevel := "info"
+	logger := logger.NewLeveledLogger(&logLevel)
 
-	// root := node.New(nil)
+	logger.Info("Generating node tree...")
+	nodes := []*node.Node{node.New(nil)}
 
-	// for i := 0; i < 3; i++ {
-	// 	root.CreateChild()
+	root := nodes[0]
 
-	// 	for j := 0; j < 2; j++ {
-	// 		root.Children[i].CreateChild()
-	// 	}
-	// }
+	for i := 0; i < 3; i++ {
+		c := root.CreateChild()
+		nodes = append(nodes, c)
 
-	// fmt.Print(root)
+		for j := 0; j < 2; j++ {
+			gc := c.CreateChild()
+			nodes = append(nodes, gc)
+		}
+	}
 
-	// if avs, err := node.Marshal(*root); err != nil {
-	// 	log.Printf("Error marshalling node: %v\n", err)
-	// } else {
-	// 	log.Println("Marshalled node struct")
-	// 	log.Println(avs)
-	// }
+	logger.Debugf("generated tree:\n%+v", nodes)
 
-	fmt.Println("Running dynamodb test...")
+	logger.Info("Running dynamodb test...")
 
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region:      aws.String("us-east-1"),
@@ -41,7 +39,37 @@ func main() {
 	}))
 
 	dynamoSvc := dynamodb.New(sess)
-	client := node.NewClient(dynamoSvc, "nodes")
+	client := node.NewClient(logger, dynamoSvc, "nodes", "ParentID-index")
+
+	logger.Info("populating table...")
+	if err := client.BatchPut(nodes); err != nil {
+		logger.Debugf("Error adding node: %v", err)
+	}
+
+	logger.Info("retrieving data from table by ID...")
+	n, err := client.Get(root.ID)
+	if err != nil {
+		logger.Errorf("Error fetching node: %v", err)
+	} else {
+		logger.Info("Results:")
+		spew.Dump(n)
+	}
+
+	logger.Info("retrieving child info for previously retrieved node...")
+	if res, err := client.GetChildren(*n); err != nil {
+		logger.Errorf("Error fetching node: %v", err)
+	} else {
+		logger.Info("Results:")
+		spew.Dump(res)
+	}
+
+	logger.Info("retrieving sibling info previously retrieved node...")
+	if res, err := client.GetSiblings(*n); err != nil {
+		logger.Errorf("Error fetching node: %v", err)
+	} else {
+		logger.Info("Results:")
+		spew.Dump(res)
+	}
 
 	// nodes := []*node.Node{}
 	// for i := 0; i < 5; i++ {
@@ -49,10 +77,10 @@ func main() {
 	// 	nodes = append(nodes, n)
 	// }
 
-	// fmt.Println("first batch write...")
-	// fmt.Println(nodes)
+	// logger.Info("first batch write...")
+	// logger.Debug(nodes)
 	// if err := client.PutA(nodes); err != nil {
-	// 	log.Printf("Error adding nodes the first time: %v\n", err)
+	// 	logger.Debugf("Error adding nodes the first time: %v\n", err)
 	// }
 
 	// fmt.Print("Press 'Enter' to continue...")
@@ -62,39 +90,17 @@ func main() {
 	// 	n.Lineage = "modified"
 	// }
 
-	// fmt.Println("second batch write...")
-	// fmt.Println(nodes)
+	// logger.Info("second batch write...")
+	// logger.Debug(nodes)
 	// if err := client.PutA(nodes); err != nil {
-	// 	log.Printf("Error adding nodes the second time: %v\n", err)
+	// 	logger.Debugf("Error adding nodes the second time: %v\n", err)
 	// }
 
-	// fmt.Println("populating table...")
-	// if err := client.BatchPut(root); err != nil {
-	// 	log.Printf("Error adding node and children: %v\n", err)
-	// }
-
-	// if err := client.Put(root); err != nil {
-	// 	log.Printf("Error adding node: %v\n", err)
-	// }
-
-	fmt.Println("retrieving data from table by ID...")
-	if n, err := client.Query("1574ec65-ac54-4c6d-b146-804cd4487745", node.ID); err != nil {
-		log.Printf("Error fetching node: %v\n", err)
-	} else {
-		log.Printf("Results: \n%v\n", n)
-	}
-
-	fmt.Println("retrieving data from table by ParentID...")
-	if n, err := client.Query("811199eb-bc4b-4d71-a1f6-7b17304541f7", node.ParentID); err != nil {
-		log.Printf("Error fetching node: %v\n", err)
-	} else {
-		log.Printf("Results: \n%v\n", n)
-	}
-
+	// logger.Info("")
 	// m, err := node.Marshal(*root)
 	// if err != nil {
 	// 	fmt.Printf("Error marshalling node: %v\n", err)
 	// }
 
-	// fmt.Println(m)
+	// logger.Info(m)
 }
