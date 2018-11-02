@@ -7,8 +7,9 @@ import (
 // Node represents a recursive struct.
 type Node struct {
 	ID       string   `dynamodbav:"ID"`
-	ParentID string   `dynamodbav:"ParentID,omitempty"`
-	ChildIDs []string `dynamodbav:"ChildIDs,omitempty,omitemptyelem"`
+	ParentID string   `dynamodbav:",omitempty"`
+	ChildIDs []string `dynamodbav:",omitempty,omitemptyelem"`
+	Metadata string   `dynamodbav:",omitempty"`
 }
 
 // New creates a new node.
@@ -34,7 +35,7 @@ func (n *Node) CreateChild() *Node {
 	return New(n)
 }
 
-// AddChild adds the given Node to the receiver.
+// RegisterChild adds the given Node to the receiver.
 func (n *Node) RegisterChild(c *Node) {
 	n.ChildIDs = append(n.ChildIDs, c.ID)
 	c.ParentID = n.ID

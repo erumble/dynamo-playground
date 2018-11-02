@@ -18,13 +18,16 @@ func main() {
 	nodes := []*node.Node{node.New(nil)}
 
 	root := nodes[0]
+	root.Metadata = "some old data"
 
 	for i := 0; i < 3; i++ {
 		c := root.CreateChild()
+		c.Metadata = "some old data"
 		nodes = append(nodes, c)
 
 		for j := 0; j < 2; j++ {
 			gc := c.CreateChild()
+			gc.Metadata = "some old data"
 			nodes = append(nodes, gc)
 		}
 	}
@@ -47,60 +50,47 @@ func main() {
 	}
 
 	logger.Info("retrieving data from table by ID...")
-	n, err := client.Get(root.ID)
+	rootRes, err := client.Get(root.ID)
 	if err != nil {
 		logger.Errorf("Error fetching node: %v", err)
 	} else {
 		logger.Info("Results:")
-		spew.Dump(n)
+		spew.Dump(rootRes)
 	}
 
 	logger.Info("retrieving child info for previously retrieved node...")
-	if res, err := client.GetChildren(*n); err != nil {
+	childRes, err := client.GetChildren(*rootRes)
+	if err != nil {
 		logger.Errorf("Error fetching node: %v", err)
 	} else {
 		logger.Info("Results:")
-		spew.Dump(res)
+		spew.Dump(childRes)
+		for _, c := range childRes {
+			c.Metadata = "some new data"
+		}
 	}
 
 	logger.Info("retrieving sibling info previously retrieved node...")
-	if res, err := client.GetSiblings(*n); err != nil {
+	siblingRes, err := client.GetSiblings(*rootRes)
+	if err != nil {
 		logger.Errorf("Error fetching node: %v", err)
 	} else {
 		logger.Info("Results:")
-		spew.Dump(res)
+		spew.Dump(siblingRes)
+		for _, s := range siblingRes {
+			s.Metadata = "some new data"
+		}
 	}
 
-	// nodes := []*node.Node{}
-	// for i := 0; i < 5; i++ {
-	// 	n := node.New(nil)
-	// 	nodes = append(nodes, n)
-	// }
+	toWrite := []*node.Node{}
+	toWrite = append(toWrite, rootRes)
+	toWrite = append(toWrite, childRes...)
+	toWrite = append(toWrite, siblingRes...)
 
-	// logger.Info("first batch write...")
-	// logger.Debug(nodes)
-	// if err := client.PutA(nodes); err != nil {
-	// 	logger.Debugf("Error adding nodes the first time: %v\n", err)
-	// }
+	logger.Info("updating table...")
+	spew.Dump(toWrite)
 
-	// fmt.Print("Press 'Enter' to continue...")
-	// bufio.NewReader(os.Stdin).ReadBytes('\n')
-
-	// for _, n := range nodes {
-	// 	n.Lineage = "modified"
-	// }
-
-	// logger.Info("second batch write...")
-	// logger.Debug(nodes)
-	// if err := client.PutA(nodes); err != nil {
-	// 	logger.Debugf("Error adding nodes the second time: %v\n", err)
-	// }
-
-	// logger.Info("")
-	// m, err := node.Marshal(*root)
-	// if err != nil {
-	// 	fmt.Printf("Error marshalling node: %v\n", err)
-	// }
-
-	// logger.Info(m)
+	if err := client.BatchPut(toWrite); err != nil {
+		logger.Errorf("Error updating table: %v", err)
+	}
 }
